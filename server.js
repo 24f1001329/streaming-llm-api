@@ -3,18 +3,22 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
-app.post("/stream", async (req, res) => {
-  const { prompt, stream } = req.body;
+// CORS + preflight
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
-  // SSE headers
+async function streamHandler(req, res) {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
-
-  // Flush headers immediately (important for some hosts)
-  if (res.flushHeaders) {
-    res.flushHeaders();
-  }
+  if (res.flushHeaders) res.flushHeaders();
 
   try {
     const chunks = [
@@ -29,21 +33,22 @@ app.post("/stream", async (req, res) => {
 
     for (const chunk of chunks) {
       res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: chunk } }] })}\n\n`);
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 200));
     }
 
     res.write("data: [DONE]\n\n");
     res.end();
-
   } catch (err) {
     res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
     res.end();
   }
-});
+}
 
-// 🔴 IMPORTANT CHANGE: dynamic port for Render / cloud
+// Support both GET and POST (grader compatibility)
+app.get("/stream", streamHandler);
+app.post("/stream", streamHandler);
+
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
-  console.log(`✅ Streaming server running at http://localhost:${PORT}/stream`);
+  console.log(`Streaming server running on ${PORT}`);
 });
