@@ -6,9 +6,15 @@ app.use(express.json());
 app.post("/stream", async (req, res) => {
   const { prompt, stream } = req.body;
 
+  // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+
+  // Flush headers immediately (important for some hosts)
+  if (res.flushHeaders) {
+    res.flushHeaders();
+  }
 
   try {
     const chunks = [
@@ -35,6 +41,9 @@ app.post("/stream", async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log("✅ Streaming server running at http://localhost:3000/stream");
+// 🔴 IMPORTANT CHANGE: dynamic port for Render / cloud
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`✅ Streaming server running at http://localhost:${PORT}/stream`);
 });
